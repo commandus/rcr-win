@@ -6,76 +6,97 @@
 #include "commctrl.h"
 #include "windowsx.h"
 
+#include "string-helper.h"
+
+#include <string>
+#include <sstream>
+
 #define MAX_LOADSTRING 100
 
 struct {
-    HINSTANCE g_hInst;
-    HWND g_hWndTab;
+    HINSTANCE hinst;
+    HWND hwParent;
+    HWND hwTopPanel;
+    HWND hwTreePanel;
+    HWND hwCardPanel;
+
+    HWND hwComponent;
+
     HWND g_hwndEdit;
     HWND g_hwndStatic;
-} RCR_MAIN_WINDOW;
 
-HRESULT doCreateMainWindow(HWND hwndParent)
+    int topHeight;
+    int treeWidth;
+    int componentX;
+    int componentY;
+
+} MW;
+
+HRESULT createMainWindow(HWND hwndParent)
 {
-    RECT rcClient;
-    INITCOMMONCONTROLSEX icex;
-    HWND hwndTab;
-    TCITEM tie;
-    int i;
-    TCHAR achTemp[256];  // Temporary buffer for strings.
+    MW.hwParent = hwndParent;
 
+    INITCOMMONCONTROLSEX icex;
     // Initialize common controls.
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
     icex.dwICC = ICC_TAB_CLASSES;
     InitCommonControlsEx(&icex);
 
+    
     // Get the dimensions of the parent window's client area, and 
     // create a tab control child window of that size. Note that g_hInst
     // is the global instance handle.
+    RECT rcClient;
     GetClientRect(hwndParent, &rcClient);
-    RCR_MAIN_WINDOW.g_hWndTab = CreateWindow(WC_TABCONTROL, L"",
-        WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
-        0, 0, rcClient.right, rcClient.bottom,
-        hwndParent, NULL, RCR_MAIN_WINDOW.g_hInst, NULL);
-    if (RCR_MAIN_WINDOW.g_hWndTab == NULL)
+    MW.topHeight = 100;
+    MW.treeWidth = 240;
+    MW.componentX = 10;
+    MW.componentY = 4;
+
+    MW.hwTopPanel = CreateWindow(WC_STATIC, L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        0, 0, rcClient.right, MW.topHeight,
+        MW.hwParent, nullptr, MW.hinst, nullptr);
+    if (!MW.hwTopPanel)
+        return S_FALSE;
+    MW.hwTreePanel = CreateWindow(WC_STATIC, L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        0, MW.topHeight, MW.treeWidth, rcClient.bottom - MW.topHeight,
+        MW.hwParent, nullptr, MW.hinst, nullptr);
+    if (!MW.hwTreePanel)
+        return S_FALSE;
+    MW.hwCardPanel = CreateWindow(WC_STATIC, L"",
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        MW.treeWidth, MW.topHeight, rcClient.right - MW.treeWidth, rcClient.bottom - MW.topHeight,
+        MW.hwParent, nullptr, MW.hinst, nullptr);
+    if (!MW.hwTreePanel)
         return S_FALSE;
 
-    // Add tabs for each day of the week. 
-    tie.mask = TCIF_TEXT | TCIF_IMAGE;
-    tie.iImage = -1;
-    tie.pszText = achTemp;
-
-    for (i = 0; i < 7; i++) {
-        // Load the day string from the string resources. Note that
-        // g_hInst is the global instance handle.
-        lstrcpyW(&achTemp[0], L"11");
-        if (TabCtrl_InsertItem(RCR_MAIN_WINDOW.g_hWndTab, i, &tie) == -1)
-        {
-            DestroyWindow(RCR_MAIN_WINDOW.g_hWndTab);
-            return NULL;
-        }
-    }
+    MW.hwComponent = CreateWindow(WC_COMBOBOX, TEXT("Component"),
+        CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
+        MW.componentX, MW.componentY, 200, 32, MW.hwTopPanel, nullptr, MW.hinst,
+        nullptr);
 
     // edit
-    RCR_MAIN_WINDOW.g_hwndEdit = CreateWindowEx(
+    MW.g_hwndEdit = CreateWindowEx(
         0, L"EDIT",   // predefined class 
         NULL,         // no window title 
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT ,
         0, 0, 0, 0,   // set size in WM_SIZE message 
-        RCR_MAIN_WINDOW.g_hWndTab,         // parent window 
+        MW.hwTopPanel,         // parent window 
         (HMENU) NULL,   // edit control ID 
-        (HINSTANCE)GetWindowLongPtr(RCR_MAIN_WINDOW.g_hWndTab, GWLP_HINSTANCE),
+        (HINSTANCE)GetWindowLongPtr(MW.hwTopPanel, GWLP_HINSTANCE),
         NULL);        // pointer not needed 
 
     TCHAR lpszLatin[] = L"Lorem ipsum dolor sit amet, consectetur ";
     // Add text to the window. 
-    SendMessage(RCR_MAIN_WINDOW.g_hwndEdit, WM_SETTEXT, 0, (LPARAM)lpszLatin);
+    SendMessage(MW.g_hwndEdit, WM_SETTEXT, 0, (LPARAM)lpszLatin);
 
 
     // static
-    RCR_MAIN_WINDOW.g_hwndStatic = CreateWindow(WC_STATIC, L"", WS_CHILD | WS_VISIBLE | WS_BORDER,
+    MW.g_hwndStatic = CreateWindow(WC_STATIC, L"", WS_CHILD | WS_VISIBLE | WS_BORDER,
         100, 100, 100, 100,
-        RCR_MAIN_WINDOW.g_hWndTab, NULL, RCR_MAIN_WINDOW.g_hInst, NULL);
+        MW.hwTopPanel, NULL, MW.hinst, NULL);
     return S_OK;
 }
 
@@ -87,21 +108,49 @@ HRESULT doCreateMainWindow(HWND hwndParent)
 //
 HRESULT OnSize(HWND hwnd, LPARAM lParam)
 {
-    RECT rc;
-
-    if (hwnd == NULL)
+    if (!hwnd)
         return E_INVALIDARG;
 
     // Resize the tab control to fit the client are of main window.
-    if (!SetWindowPos(RCR_MAIN_WINDOW.g_hWndTab, HWND_TOP, 0, 0, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), SWP_SHOWWINDOW))
+
+    int w = GET_X_LPARAM(lParam);
+    int h = GET_Y_LPARAM(lParam);
+
+    if (!SetWindowPos(MW.hwTopPanel, HWND_TOP, 0, 0, w, MW.topHeight, SWP_SHOWWINDOW))
+        return E_FAIL;
+    RECT rc;
+    if (!SetWindowPos(MW.hwTreePanel, HWND_TOP, 0, MW.topHeight, MW.treeWidth, h - MW.topHeight, SWP_SHOWWINDOW))
+        return E_FAIL;
+    if (!SetWindowPos(MW.hwCardPanel, HWND_TOP, MW.treeWidth, MW.topHeight, w - MW.treeWidth, h - MW.topHeight, SWP_SHOWWINDOW))
+        return E_FAIL;
+    if (!SetWindowPos(MW.hwComponent, HWND_TOP, MW.componentX, MW.componentY, 200, 32, SWP_SHOWWINDOW))
         return E_FAIL;
 
-    MoveWindow(RCR_MAIN_WINDOW.g_hwndEdit,
+    MoveWindow(MW.g_hwndEdit,
         0, 30,                  // starting x- and y-coordinates 
         LOWORD(lParam),        // width of client area 
         40,        // height of client area 
         TRUE);
 
+    return S_OK;
+}
+
+HRESULT fillData()
+{
+    for (int i = 0; i < 22; i++) {
+        TCHAR A[32];
+        toUpperCase("a");
+        wcscpy_s(A, sizeof(A) / sizeof(TCHAR), (TCHAR*) L"asdasd");
+        std::stringstream ss;
+        ss << i;
+
+        // Add string to combobox.
+        SendMessage(MW.hwComponent, (UINT) CB_ADDSTRING, (WPARAM)0, (LPARAM)A);
+    }
+
+    // Send the CB_SETCURSEL message to display an initial item 
+    //  in the selection field  
+    SendMessage(MW.hwComponent, CB_SETCURSEL, (WPARAM) 2, (LPARAM) 4);
     return S_OK;
 }
 
@@ -161,7 +210,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
 
-    RCR_MAIN_WINDOW.g_hInst = hInstance;
+    MW.hinst = hInstance;
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -241,7 +290,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
-   doCreateMainWindow(hWnd);
+   createMainWindow(hWnd);
+   fillData();
+
 
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
@@ -292,13 +343,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         OnSize(hWnd, lParam);
         break;
     case WM_NOTIFY:
-        OnNotify(RCR_MAIN_WINDOW.g_hWndTab, RCR_MAIN_WINDOW.g_hwndStatic, lParam);
+        OnNotify(MW.hwTopPanel, MW.g_hwndStatic, lParam);
         break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
     case WM_SETFOCUS:
-        SetFocus(RCR_MAIN_WINDOW.g_hwndEdit);
+        SetFocus(MW.g_hwndEdit);
         return 0;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);

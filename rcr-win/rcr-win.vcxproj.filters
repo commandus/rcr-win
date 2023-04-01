@@ -27,9 +27,15 @@
     <ClInclude Include="rcr-win.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="string-helper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="rcr-win.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string-helper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
