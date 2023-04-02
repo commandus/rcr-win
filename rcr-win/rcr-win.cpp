@@ -10,6 +10,7 @@
 
 #include <string>
 #include <sstream>
+#include <vector>
 
 #define MAX_LOADSTRING 100
 
@@ -29,6 +30,8 @@ struct {
     int treeWidth;
     int componentX;
     int componentY;
+
+    std::vector <std::wstring> componentName;
 
 } MW;
 
@@ -73,16 +76,18 @@ HRESULT createMainWindow(HWND hwndParent)
         return S_FALSE;
 
     MW.hwComponent = CreateWindow(WC_COMBOBOX, TEXT("Component"),
-        CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
-        MW.componentX, MW.componentY, 200, 32, MW.hwTopPanel, nullptr, MW.hinst,
+        CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
+        MW.componentX, MW.componentY, 200, 300, MW.hwTopPanel, nullptr, MW.hinst,
         nullptr);
 
+    // SendMessage(MW.hwComponent, CB_SHOWDROPDOWN, (WPARAM) TRUE, (LPARAM)0);
+    
     // edit
     MW.g_hwndEdit = CreateWindowEx(
         0, L"EDIT",   // predefined class 
         NULL,         // no window title 
         WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT ,
-        0, 0, 0, 0,   // set size in WM_SIZE message 
+        220, 0, 0, 0,   // set size in WM_SIZE message 
         MW.hwTopPanel,         // parent window 
         (HMENU) NULL,   // edit control ID 
         (HINSTANCE)GetWindowLongPtr(MW.hwTopPanel, GWLP_HINSTANCE),
@@ -123,29 +128,23 @@ HRESULT OnSize(HWND hwnd, LPARAM lParam)
         return E_FAIL;
     if (!SetWindowPos(MW.hwCardPanel, HWND_TOP, MW.treeWidth, MW.topHeight, w - MW.treeWidth, h - MW.topHeight, SWP_SHOWWINDOW))
         return E_FAIL;
-    if (!SetWindowPos(MW.hwComponent, HWND_TOP, MW.componentX, MW.componentY, 200, 32, SWP_SHOWWINDOW))
+    if (!SetWindowPos(MW.hwComponent, HWND_TOP, MW.componentX, MW.componentY, 200, 300, SWP_SHOWWINDOW))
         return E_FAIL;
 
     MoveWindow(MW.g_hwndEdit,
-        0, 30,                  // starting x- and y-coordinates 
-        LOWORD(lParam),        // width of client area 
-        40,        // height of client area 
-        TRUE);
-
+        220, 30, LOWORD(lParam), 40, TRUE);
     return S_OK;
 }
 
 HRESULT fillData()
 {
     for (int i = 0; i < 22; i++) {
-        TCHAR A[32];
-        toUpperCase("a");
-        wcscpy_s(A, sizeof(A) / sizeof(TCHAR), (TCHAR*) L"asdasd");
         std::stringstream ss;
-        ss << i;
+        ss << "component " << i;
+        MW.componentName.push_back(utf82wstring(ss.str()));
 
         // Add string to combobox.
-        SendMessage(MW.hwComponent, (UINT) CB_ADDSTRING, (WPARAM)0, (LPARAM)A);
+        SendMessage(MW.hwComponent, (UINT) CB_ADDSTRING, (WPARAM)0, (LPARAM)MW.componentName[i].c_str());
     }
 
     // Send the CB_SETCURSEL message to display an initial item 
@@ -317,7 +316,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
-            // Parse the menu selections:
+            int wId = HIWORD(wParam);
+            if (wId == CBN_SELCHANGE) {
+                int ItemIndex = SendMessage((HWND)lParam, (UINT)CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
+                TCHAR  ListItem[256];
+                (TCHAR) SendMessage((HWND)lParam, (UINT)CB_GETLBTEXT, (WPARAM)ItemIndex, (LPARAM)ListItem);
+                MessageBox(MW.hwComponent, (LPCWSTR)ListItem, TEXT("Item Selected"), MB_OK);
+                break;
+            }
             switch (wmId)
             {
             case IDM_ABOUT:

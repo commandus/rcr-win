@@ -16,19 +16,11 @@ std::string toUpperCase(const std::string &value)
 
 std::wstring utf82wstring(const std::string& value)
 {
-    icu::UnicodeString ustr;
-    ustr.fromUTF8(value);
+    icu::UnicodeString ustr = icu::UnicodeString::fromUTF8(icu::StringPiece(value.c_str()));
     // obtain the size of string we need
-    int32_t requiredSize;
-    UErrorCode error = U_ZERO_ERROR;
-
-    u_strToWCS(nullptr, 0, &requiredSize, ustr.getBuffer(), ustr.length(), &error);
-
-    std::wstring wstr;
-    // resize accordingly (this will not include any terminating null character, but it also doesn't need to either)
-    wstr.resize(requiredSize);
-
-    // copy the UnicodeString buffer to the std::wstring.
-    u_strToWCS(wstr.data(), wstr.size(), nullptr, ustr.getBuffer(), ustr.length(), &error);
-    return wstr;
+    std::wstring ws;
+    ws.reserve(ustr.length());
+    for (int i = 0; i < ustr.length(); ++i)
+        ws += static_cast<wchar_t>(ustr[i]);
+    return ws;
 }
