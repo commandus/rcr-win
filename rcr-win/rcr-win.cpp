@@ -22,6 +22,7 @@ struct {
     HWND hwCardPanel;
 
     HWND hwComponent;
+    HWND hwTVBox;
 
     HWND g_hwndEdit;
     HWND g_hwndStatic;
@@ -34,6 +35,109 @@ struct {
     std::vector <std::wstring> componentName;
 
 } MW;
+
+/*
+BOOL InitTreeViewImageLists(HWND hwndTV)
+{
+    HIMAGELIST himl;  // handle to image list 
+    HBITMAP hbmp;     // handle to bitmap 
+
+    // Create the image list. 
+    if ((himl = ImageList_Create(CX_BITMAP,
+        CY_BITMAP,
+        FALSE,
+        NUM_BITMAPS, 0)) == NULL)
+        return FALSE;
+
+    // Add the open file, closed file, and document bitmaps. 
+    hbmp = LoadBitmap(MW.hinst, MAKEINTRESOURCE(IDB_OPEN_FILE));
+    g_nOpen = ImageList_Add(himl, hbmp, (HBITMAP) NULL);
+    DeleteObject(hbmp);
+
+    hbmp = LoadBitmap(MW.hinst, MAKEINTRESOURCE(IDB_CLOSED_FILE));
+    g_nClosed = ImageList_Add(himl, hbmp, (HBITMAP) NULL);
+    DeleteObject(hbmp);
+
+    hbmp = LoadBitmap(MW.hinst, MAKEINTRESOURCE(IDB_DOCUMENT));
+    g_nDocument = ImageList_Add(himl, hbmp, (HBITMAP) NULL);
+    DeleteObject(hbmp);
+
+    // Fail if not all of the images were added. 
+    if (ImageList_GetImageCount(himl) < 3)
+        return FALSE;
+
+    // Associate the image list with the tree-view control. 
+    TreeView_SetImageList(hwndTV, himl, TVSIL_NORMAL);
+
+    return TRUE;
+}
+*/
+
+HTREEITEM AddItemToTree(HWND hwndTV, LPTSTR lpszItem, int nLevel)
+{
+    TVITEM tvi;
+    TVINSERTSTRUCT tvins;
+    static HTREEITEM hPrev = (HTREEITEM)TVI_FIRST;
+    static HTREEITEM hPrevRootItem = NULL;
+    static HTREEITEM hPrevLev2Item = NULL;
+    HTREEITEM hti;
+
+    tvi.mask = TVIF_TEXT | TVIF_IMAGE
+        | TVIF_SELECTEDIMAGE | TVIF_PARAM;
+
+    // Set the text of the item. 
+    tvi.pszText = lpszItem;
+    tvi.cchTextMax = sizeof(tvi.pszText) / sizeof(tvi.pszText[0]);
+
+    // Assume the item is not a parent item, so give it a 
+    // document image. 
+    // 
+    // 
+    // TODO ---------------
+    // tvi.iImage = g_nDocument;
+    //tvi.iSelectedImage = g_nDocument;
+
+    // Save the heading level in the item's application-defined 
+    // data area. 
+    tvi.lParam = (LPARAM)nLevel;
+    tvins.item = tvi;
+    tvins.hInsertAfter = hPrev;
+
+    // Set the parent item based on the specified level. 
+    if (nLevel == 1)
+        tvins.hParent = TVI_ROOT;
+    else if (nLevel == 2)
+        tvins.hParent = hPrevRootItem;
+    else
+        tvins.hParent = hPrevLev2Item;
+
+    // Add the item to the tree-view control. 
+    hPrev = (HTREEITEM)SendMessage(hwndTV, TVM_INSERTITEM,
+        0, (LPARAM)(LPTVINSERTSTRUCT)&tvins);
+
+    if (hPrev == NULL)
+        return NULL;
+
+    // Save the handle to the item. 
+    if (nLevel == 1)
+        hPrevRootItem = hPrev;
+    else if (nLevel == 2)
+        hPrevLev2Item = hPrev;
+
+    // The new item is a child item. Give the parent item a 
+    // closed folder bitmap to indicate it now has child items. 
+    if (nLevel > 1)
+    {
+        hti = TreeView_GetParent(hwndTV, hPrev);
+        tvi.mask = TVIF_IMAGE | TVIF_SELECTEDIMAGE;
+        tvi.hItem = hti;
+//        tvi.iImage = g_nClosed;
+//        tvi.iSelectedImage = g_nClosed;
+        TreeView_SetItem(hwndTV, &tvi);
+    }
+
+    return hPrev;
+}
 
 HRESULT createMainWindow(HWND hwndParent)
 {
@@ -80,6 +184,12 @@ HRESULT createMainWindow(HWND hwndParent)
         MW.componentX, MW.componentY, 200, 300, MW.hwTopPanel, nullptr, MW.hinst,
         nullptr);
 
+    MW.hwTVBox = CreateWindowEx(0, WC_TREEVIEW, TEXT("Boxes"),
+        WS_VISIBLE | WS_CHILD | WS_BORDER | TVS_HASLINES,
+        0, 0, MW.treeWidth, rcClient.bottom - MW.topHeight,
+        MW.hwTreePanel, (HMENU) nullptr, MW.hinst, nullptr);
+    // if (!InitTreeViewImageLists(MW.hwTVBox) || !InitTreeViewItems(MW.hwTVBox))
+    //    return S_FALSE;
     // SendMessage(MW.hwComponent, CB_SHOWDROPDOWN, (WPARAM) TRUE, (LPARAM)0);
     
     // edit
@@ -130,7 +240,9 @@ HRESULT OnSize(HWND hwnd, LPARAM lParam)
         return E_FAIL;
     if (!SetWindowPos(MW.hwComponent, HWND_TOP, MW.componentX, MW.componentY, 200, 300, SWP_SHOWWINDOW))
         return E_FAIL;
-
+    if (!SetWindowPos(MW.hwTVBox, HWND_TOP, 0, 0, MW.treeWidth, h - MW.topHeight, SWP_SHOWWINDOW))
+        return E_FAIL;
+    
     MoveWindow(MW.g_hwndEdit,
         220, 30, LOWORD(lParam), 40, TRUE);
     return S_OK;
@@ -150,6 +262,12 @@ HRESULT fillData()
     // Send the CB_SETCURSEL message to display an initial item 
     //  in the selection field  
     SendMessage(MW.hwComponent, CB_SETCURSEL, (WPARAM) 2, (LPARAM) 4);
+
+    wchar_t s[] = L"root";
+    HTREEITEM hti = AddItemToTree(MW.hwTVBox, (LPTSTR) &s, 0);
+    hti = AddItemToTree(MW.hwTVBox, (LPTSTR)&s, 1);
+    hti = AddItemToTree(MW.hwTVBox, (LPTSTR)&s, 1);
+
     return S_OK;
 }
 
