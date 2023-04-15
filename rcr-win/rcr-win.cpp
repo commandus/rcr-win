@@ -22,6 +22,7 @@ struct {
     HWND hwCardPanel;
 
     HWND hwComponent;
+    HWND hwSearch;
     HWND hwTVBox;
 
     HWND g_hwndEdit;
@@ -29,6 +30,7 @@ struct {
 
     int topHeight;
     int treeWidth;
+    int componentWidth;
     int componentX;
     int componentY;
 
@@ -157,6 +159,7 @@ HRESULT createMainWindow(HWND hwndParent)
     GetClientRect(hwndParent, &rcClient);
     MW.topHeight = 100;
     MW.treeWidth = 240;
+    MW.componentWidth = 200;
     MW.componentX = 10;
     MW.componentY = 4;
 
@@ -181,7 +184,12 @@ HRESULT createMainWindow(HWND hwndParent)
 
     MW.hwComponent = CreateWindow(WC_COMBOBOX, TEXT("Component"),
         CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
-        MW.componentX, MW.componentY, 200, 300, MW.hwTopPanel, nullptr, MW.hinst,
+        MW.componentX, MW.componentY, MW.componentWidth, 300, MW.hwTopPanel, nullptr, MW.hinst,
+        nullptr);
+
+    MW.hwSearch = CreateWindow(WC_EDIT, TEXT("Search"),
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        MW.componentX + MW.componentWidth + 2, MW.componentY, rcClient.right - MW.componentWidth - MW.componentX - 4, 300, MW.hwTopPanel, nullptr, MW.hinst,
         nullptr);
 
     MW.hwTVBox = CreateWindowEx(0, WC_TREEVIEW, TEXT("Boxes"),
