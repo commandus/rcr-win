@@ -14,7 +14,7 @@
 
 #define MAX_LOADSTRING 100
 
-struct {
+struct RCR_MAIN_WINDOW_STATE {
     HINSTANCE hinst;
     HWND hwParent;
     HWND hwTopPanel;
@@ -25,14 +25,13 @@ struct {
     HWND hwSearch;
     HWND hwTVBox;
 
-    HWND g_hwndEdit;
-    HWND g_hwndStatic;
-
     int topHeight;
     int treeWidth;
     int componentWidth;
     int componentX;
     int componentY;
+    int SearchHeight;
+    int hwComponentHeight;
 
     std::vector <std::wstring> componentName;
 
@@ -157,11 +156,13 @@ HRESULT createMainWindow(HWND hwndParent)
     // is the global instance handle.
     RECT rcClient;
     GetClientRect(hwndParent, &rcClient);
-    MW.topHeight = 100;
+    MW.topHeight = 32;
     MW.treeWidth = 240;
     MW.componentWidth = 200;
-    MW.componentX = 10;
-    MW.componentY = 4;
+    MW.componentX = 2;
+    MW.componentY = 2;
+    MW.SearchHeight = 22;
+    MW.hwComponentHeight = 300;
 
     MW.hwTopPanel = CreateWindow(WC_STATIC, L"",
         WS_CHILD | WS_VISIBLE | WS_BORDER,
@@ -184,12 +185,13 @@ HRESULT createMainWindow(HWND hwndParent)
 
     MW.hwComponent = CreateWindow(WC_COMBOBOX, TEXT("Component"),
         CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
-        MW.componentX, MW.componentY, MW.componentWidth, 300, MW.hwTopPanel, nullptr, MW.hinst,
+        MW.componentX, MW.componentY, MW.componentWidth, MW.hwComponentHeight, MW.hwTopPanel, nullptr, MW.hinst,
         nullptr);
 
     MW.hwSearch = CreateWindow(WC_EDIT, TEXT("Search"),
         WS_CHILD | WS_VISIBLE | WS_BORDER,
-        MW.componentX + MW.componentWidth + 2, MW.componentY, rcClient.right - MW.componentWidth - MW.componentX - 4, 300, MW.hwTopPanel, nullptr, MW.hinst,
+        MW.componentX + MW.componentWidth + 2, MW.componentY, 
+        rcClient.right - MW.componentWidth - MW.componentX - 4, MW.SearchHeight, MW.hwTopPanel, nullptr, MW.hinst,
         nullptr);
 
     MW.hwTVBox = CreateWindowEx(0, WC_TREEVIEW, TEXT("Boxes"),
@@ -200,26 +202,6 @@ HRESULT createMainWindow(HWND hwndParent)
     //    return S_FALSE;
     // SendMessage(MW.hwComponent, CB_SHOWDROPDOWN, (WPARAM) TRUE, (LPARAM)0);
     
-    // edit
-    MW.g_hwndEdit = CreateWindowEx(
-        0, L"EDIT",   // predefined class 
-        NULL,         // no window title 
-        WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT ,
-        220, 0, 0, 0,   // set size in WM_SIZE message 
-        MW.hwTopPanel,         // parent window 
-        (HMENU) NULL,   // edit control ID 
-        (HINSTANCE)GetWindowLongPtr(MW.hwTopPanel, GWLP_HINSTANCE),
-        NULL);        // pointer not needed 
-
-    TCHAR lpszLatin[] = L"Lorem ipsum dolor sit amet, consectetur ";
-    // Add text to the window. 
-    SendMessage(MW.g_hwndEdit, WM_SETTEXT, 0, (LPARAM)lpszLatin);
-
-
-    // static
-    MW.g_hwndStatic = CreateWindow(WC_STATIC, L"", WS_CHILD | WS_VISIBLE | WS_BORDER,
-        100, 100, 100, 100,
-        MW.hwTopPanel, NULL, MW.hinst, NULL);
     return S_OK;
 }
 
@@ -246,13 +228,15 @@ HRESULT OnSize(HWND hwnd, LPARAM lParam)
         return E_FAIL;
     if (!SetWindowPos(MW.hwCardPanel, HWND_TOP, MW.treeWidth, MW.topHeight, w - MW.treeWidth, h - MW.topHeight, SWP_SHOWWINDOW))
         return E_FAIL;
-    if (!SetWindowPos(MW.hwComponent, HWND_TOP, MW.componentX, MW.componentY, 200, 300, SWP_SHOWWINDOW))
+    if (!SetWindowPos(MW.hwComponent, HWND_TOP, MW.componentX, MW.componentY, 200, MW.hwComponentHeight, SWP_SHOWWINDOW))
         return E_FAIL;
+    if (!SetWindowPos(MW.hwSearch, HWND_TOP, MW.componentX + MW.componentWidth + 2, MW.componentY, 
+        w - MW.componentWidth - MW.componentX - 4, MW.SearchHeight, SWP_SHOWWINDOW))
+        return E_FAIL;
+    
     if (!SetWindowPos(MW.hwTVBox, HWND_TOP, 0, 0, MW.treeWidth, h - MW.topHeight, SWP_SHOWWINDOW))
         return E_FAIL;
     
-    MoveWindow(MW.g_hwndEdit,
-        220, 30, LOWORD(lParam), 40, TRUE);
     return S_OK;
 }
 
@@ -474,14 +458,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_SIZE:
         OnSize(hWnd, lParam);
         break;
-    case WM_NOTIFY:
-        OnNotify(MW.hwTopPanel, MW.g_hwndStatic, lParam);
-        break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
     case WM_SETFOCUS:
-        SetFocus(MW.g_hwndEdit);
+        SetFocus(MW.hwSearch);
         return 0;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
